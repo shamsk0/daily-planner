@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily Planner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem; }
+    .container { width: 100%; max-width: 560px; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; }
+
+    .top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .day-nav { display: flex; align-items: center; gap: 10px; }
+    .day-btn { background: #fff; border: 1px solid #ddd; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+    .day-btn:hover { background: #f0f0f0; }
+    .day-label { font-size: 15px; font-weight: 500; min-width: 180px; text-align: center; }
+    .today-btn { font-size: 12px; color: #2563eb; cursor: pointer; border: none; background: none; }
+    .today-btn:hover { text-decoration: underline; }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+    .stat { background: #fff; border-radius: 10px; padding: 0.75rem 1rem; border: 1px solid #eee; }
+    .stat-label { font-size: 11px; color: #888; letter-spacing: .04em; margin-bottom: 4px; }
+    .stat-val { font-size: 22px; font-weight: 600; }
+
+    .progress-bar { height: 5px; background: #e5e7eb; border-radius: 3px; margin-bottom: 1.25rem; overflow: hidden; }
+    .progress-fill { height: 100%; background: #22c55e; border-radius: 3px; transition: width .3s; }
+
+    .add-row { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+    .add-row input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+    .add-row input:focus { border-color: #2563eb; }
+    .add-row select { padding: 8px 8px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; outline: none; }
+    .add-row button { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .add-row button:hover { background: #1d4ed8; }
+
+    .section-label { font-size: 11px; letter-spacing: .05em; color: #888; margin: 1rem 0 6px; text-transform: uppercase; }
+
+    .task { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #eee; border-radius: 10px; margin-bottom: 6px; transition: opacity .2s; }
+    .task.done { opacity: .5; }
+    .task.done .task-text { text-decoration: line-through; color: #888; }
+    .check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ccc; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .check.checked { background: #22c55e; border-color: #22c55e; }
+    .check.checked::after { content: ''; display: block; width: 5px; height: 8px; border: 2px solid #fff; border-top: none; border-left: none; transform: rotate(45deg) translate(-1px,-1px); }
+    .task-text { flex: 1; font-size: 14px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; flex-shrink: 0; }
+    .badge-high { background: #fee2e2; color: #b91c1c; }
+    .badge-med  { background: #fef3c7; color: #b45309; }
+    .badge-low  { background: #dcfce7; color: #15803d; }
+    .del-btn { background: none; border: none; cursor: pointer; color: #bbb; font-size: 18px; padding: 0 2px; line-height: 1; }
+    .del-btn:hover { color: #ef4444; }
+    .empty { text-align: center; padding: 2rem 0; font-size: 13px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Daily Planner</h1>
+
+    <div class="top-row">
+      <div class="day-nav">
+        <button class="day-btn" onclick="shiftDay(-1)">&#8249;</button>
+        <div class="day-label" id="day-label"></div>
+        <button class="day-btn" onclick="shiftDay(1)">&#8250;</button>
+      </div>
+      <button class="today-btn" onclick="goToday()">Today</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-label">TOTAL</div><div class="stat-val" id="stat-total">0</div></div>
+      <div class="stat"><div class="stat-label">DONE</div><div class="stat-val" id="stat-done">0</div></div>
+      <div class="stat"><div class="stat-label">LEFT</div><div class="stat-val" id="stat-left">0</div></div>
+    </div>
+
+    <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+
+    <div class="add-row">
+      <input type="text" id="task-input" placeholder="Add a task..." onkeydown="if(event.key==='Enter')addTask()" />
+      <select id="prio-select">
+        <option value="med">Medium</option>
+        <option value="high">High</option>
+        <option value="low">Low</option>
+      </select>
+      <button onclick="addTask()">+ Add</button>
+    </div>
+
+    <div id="task-list"></div>
+  </div>
+
+  <script>
+    const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let offset = 0;
+    let data = JSON.parse(localStorage.getItem('planner') || '{}');
+
+    function save() { localStorage.setItem('planner', JSON.stringify(data)); }
+    function dateKey(o) {
+      const d = new Date(); d.setDate(d.getDate() + o);
+      return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    }
+    function dayTitle(o) {
+      const d = new Date(); d.setDate(d.getDate() + o);
+      const label = o===0?'Today':o===1?'Tomorrow':o===-1?'Yesterday':DAYS[d.getDay()];
+      return label+', '+MONTHS[d.getMonth()]+' '+d.getDate();
+    }
+    function getTasks() { return data[dateKey(offset)] || []; }
+    function saveTasks(t) { data[dateKey(offset)] = t; save(); }
+
+    function render() {
+      document.getElementById('day-label').textContent = dayTitle(offset);
+      const tasks = getTasks();
+      const done  = tasks.filter(t => t.done).length;
+      const total = tasks.length;
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-done').textContent  = done;
+      document.getElementById('stat-left').textContent  = total - done;
+      document.getElementById('prog').style.width = total ? Math.round(done/total*100)+'%' : '0%';
+
+      const pending   = tasks.filter(t => !t.done);
+      const completed = tasks.filter(t =>  t.done);
+      let html = '';
+      if (pending.length)   { html += '<div class="section-label">To do</div>';    pending.forEach(t   => html += taskHTML(t)); }
+      if (completed.length) { html += '<div class="section-label">Completed</div>'; completed.forEach(t => html += taskHTML(t)); }
+      if (!tasks.length)    { html  = '<div class="empty">No tasks for this day — add one above</div>'; }
+      document.getElementById('task-list').innerHTML = html;
+    }
+
+    function taskHTML(t) {
+      const badge = t.prio==='high'?'badge-high':t.prio==='low'?'badge-low':'badge-med';
+      const label = t.prio==='high'?'High':t.prio==='low'?'Low':'Med';
+      return `<div class="task${t.done?' done':''}">
+        <div class="check${t.done?' checked':''}" onclick="toggle('${t.id}')"></div>
+        <span class="task-text">${esc(t.text)}</span>
+        <span class="badge ${badge}">${label}</span>
+        <button class="del-btn" onclick="del('${t.id}')">&#215;</button>
+      </div>`;
+    }
+
+    function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function addTask() {
+      const inp  = document.getElementById('task-input');
+      const prio = document.getElementById('prio-select').value;
+      const text = inp.value.trim();
+      if (!text) return;
+      const tasks = getTasks();
+      tasks.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2), text, prio, done: false });
+      saveTasks(tasks);
+      inp.value = '';
+      render();
+    }
+
+    function toggle(id) {
+      const tasks = getTasks();
+      const t = tasks.find(x => x.id === id);
+      if (t) t.done = !t.done;
+      saveTasks(tasks);
+      render();
+    }
+
+    function del(id) { saveTasks(getTasks().filter(x => x.id !== id)); render(); }
+    function shiftDay(d) { offset += d; render(); }
+    function goToday()   { offset  = 0; render(); }
+
+    render();
+  </script>
+</body>
+</html>
