@@ -1,1 +1,3 @@
-# daily-planner
+# Daily-planner
+
+Runs on local
